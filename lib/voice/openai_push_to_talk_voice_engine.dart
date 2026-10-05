@@ -48,6 +48,7 @@ class OpenAiPushToTalkVoiceEngine implements VoiceEngine {
     httpRequest.write(
       jsonEncode(<String, Object?>{
         'channelId': request.channel.id,
+        'backend': request.backendTarget.name,
         'audioWavBase64': base64Encode(wav),
         'history': request.history
             .take(40)

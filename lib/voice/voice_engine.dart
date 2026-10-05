@@ -2,16 +2,20 @@ import 'package:ai_remote/core/models/channel.dart';
 import 'package:ai_remote/core/models/conversation_message.dart';
 import 'package:ai_remote/voice/audio_capture_service.dart';
 
+enum VoiceBackendTarget { openai, codex }
+
 class VoiceTurnRequest {
   const VoiceTurnRequest({
     required this.channel,
     required this.history,
     required this.audio,
+    this.backendTarget = VoiceBackendTarget.openai,
   });
 
   final Channel channel;
   final List<ConversationMessage> history;
   final AudioCaptureResult audio;
+  final VoiceBackendTarget backendTarget;
 }
 
 class VoiceTurnResult {

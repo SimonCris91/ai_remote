@@ -37,6 +37,7 @@ class AppController extends ChangeNotifier {
     this.googleIdentityService,
     this.pairingIdentityService,
     this.voiceBackendUri,
+    this.codexChannelIds = const <String>{},
     this.remoteAdapter,
     this.chordMonitor,
     this.pitchTuner,
@@ -63,6 +64,7 @@ class AppController extends ChangeNotifier {
   final AiIdentityService? googleIdentityService;
   final PairingIdentityService? pairingIdentityService;
   final Uri? voiceBackendUri;
+  final Set<String> codexChannelIds;
   final TranslatorService translatorService;
   final AudioCaptureService audioCapture;
   final SpeechOutput speechOutput;
@@ -322,6 +324,9 @@ class AppController extends ChangeNotifier {
         channel: channel,
         history: session.messages,
         audio: audio,
+        backendTarget: codexChannelIds.contains(channel.id)
+            ? VoiceBackendTarget.codex
+            : VoiceBackendTarget.openai,
       ),
     );
     if (operation != _operationId) {

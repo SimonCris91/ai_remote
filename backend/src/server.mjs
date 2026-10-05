@@ -59,7 +59,7 @@ async function requestOpenAiSecret(path, session, subject, env) {
   return payload;
 }
 
-async function processVoiceTurn(body, subject, env) {
+async function processVoiceTurn(body, subject, env, codex, codexThreads) {
   if (!env.OPENAI_API_KEY) {
     throw Object.assign(new Error("OpenAI is not configured"), { status: 503 });
   }
@@ -107,6 +107,21 @@ async function processVoiceTurn(body, subject, env) {
     throw Object.assign(new Error("Audio transcription failed"), { status: 502 });
   }
 
+  if (body.backend === "codex") {
+    const key = `${subject}:${body.channelId}`;
+    const result = await codex.turn({
+      channelId: body.channelId,
+      message: transcription.text,
+      threadId: codexThreads.get(key),
+    });
+    codexThreads.set(key, result.threadId);
+    return {
+      transcript: transcription.text,
+      responseText: result.responseText,
+      codexThreadId: result.threadId,
+    };
+  }
+
   const response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: {
@@ -138,6 +153,7 @@ async function processVoiceTurn(body, subject, env) {
 
 export function createAiRemoteServer(env = process.env) {
   const codex = new CodexAppServerClient({ env });
+  const codexThreads = new Map();
   return createServer(async (request, response) => {
     try {
       const url = new URL(request.url ?? "/", "http://localhost");
@@ -177,7 +193,7 @@ export function createAiRemoteServer(env = process.env) {
         return;
       }
       if (url.pathname === "/v1/voice/turn") {
-        const result = await processVoiceTurn(body, user.sub, env);
+        const result = await processVoiceTurn(body, user.sub, env, codex, codexThreads);
         sendJson(response, 200, result);
         return;
       }

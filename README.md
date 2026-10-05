@@ -151,6 +151,12 @@ backend environment, and never sends it to Flutter. Configure `CODEX_ACCESS_TOKE
 The first live request must be tested on that host; a local APK cannot access the
 App Server directly.
 
+To route selected phone channels to Codex, build with the public configuration
+`--dart-define=AI_REMOTE_CODEX_CHANNELS=lavormetal-daily,technical-agent`.
+This contains channel ids only, not credentials. Those channels still require the
+normal AI Remote bearer authentication, and fall back to the existing OpenAI/mock
+path when Codex is not enabled on the backend.
+
 Required for live API calls:
 
 - `OPENAI_API_KEY`: standard server credential; never put it in Flutter.

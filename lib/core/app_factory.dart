@@ -25,6 +25,12 @@ Future<AppController> createDefaultAppController() async {
     'GOOGLE_SERVER_CLIENT_ID',
   );
   const backendUrl = String.fromEnvironment('AI_REMOTE_BACKEND_URL');
+  const codexChannelConfig = String.fromEnvironment('AI_REMOTE_CODEX_CHANNELS');
+  final codexChannelIds = codexChannelConfig
+      .split(',')
+      .map((value) => value.trim())
+      .where((value) => value.isNotEmpty)
+      .toSet();
   final parsedBackendUri = Uri.tryParse(backendUrl);
   final voiceBackendUri =
       parsedBackendUri != null &&
@@ -87,6 +93,7 @@ Future<AppController> createDefaultAppController() async {
         : googleIdentityService,
     pairingIdentityService: pairingIdentityService,
     voiceBackendUri: voiceBackendUri,
+    codexChannelIds: codexChannelIds,
     translatorService: MockTranslatorService(),
     audioCapture: RecordAudioCaptureService(),
     speechOutput: FlutterTtsSpeechOutput(),
