@@ -151,6 +151,11 @@ backend environment, and never sends it to Flutter. Configure `CODEX_ACCESS_TOKE
 The first live request must be tested on that host; a local APK cannot access the
 App Server directly.
 
+For the local Windows host, `tool/start_codex_backend.ps1` reads the existing
+Codex login token at runtime, exports it only to the backend process, and starts
+the server with the Codex bridge enabled. The token is never written to the
+repository or sent to the phone.
+
 To route selected phone channels to Codex, build with the public configuration
 `--dart-define=AI_REMOTE_CODEX_CHANNELS=lavormetal-daily,technical-agent`.
 This contains channel ids only, not credentials. Those channels still require the
