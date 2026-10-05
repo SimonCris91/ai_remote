@@ -1,0 +1,9 @@
+# Named Cloudflare Tunnel configuration. Copy to the cloudflared config path
+# only after `cloudflared tunnel login` and `cloudflared tunnel create`.
+tunnel: REPLACE_WITH_TUNNEL_UUID
+credentials-file: C:\Users\<user>\.cloudflared\REPLACE_WITH_TUNNEL_UUID.json
+
+ingress:
+  - hostname: remote.aquariusageai.com
+    service: http://127.0.0.1:8787
+  - service: http_status:404

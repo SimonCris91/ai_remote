@@ -1,0 +1,6 @@
+interface:
+  display_name: "AI Remote Device Control"
+  short_description: "Integra wearable e comandi hardware indipendenti"
+  default_prompt: "Usa $ai-remote-device-control per aggiungere questa integrazione hardware ad AI Remote in modo sicuro."
+policy:
+  allow_implicit_invocation: true

@@ -1,0 +1,6 @@
+interface:
+  display_name: "AI Remote Regression Check"
+  short_description: "Verifica regressioni Flutter e contratti principali"
+  default_prompt: "Usa $ai-remote-regression-check per verificare questa modifica di AI Remote e riportare i limiti reali dei test."
+policy:
+  allow_implicit_invocation: true

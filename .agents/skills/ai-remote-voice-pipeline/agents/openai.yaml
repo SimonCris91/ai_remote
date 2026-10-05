@@ -1,0 +1,6 @@
+interface:
+  display_name: "AI Remote Voice Pipeline"
+  short_description: "Gestisce voce, traduzione e provider realtime"
+  default_prompt: "Usa $ai-remote-voice-pipeline per sviluppare o diagnosticare il flusso vocale di AI Remote."
+policy:
+  allow_implicit_invocation: true

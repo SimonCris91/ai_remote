@@ -1,0 +1,6 @@
+interface:
+  display_name: "AI Remote Feature Builder"
+  short_description: "Sviluppa funzioni Flutter senza rompere i contratti"
+  default_prompt: "Usa $ai-remote-feature-builder per implementare questa funzione in AI Remote preservando architettura e test."
+policy:
+  allow_implicit_invocation: true

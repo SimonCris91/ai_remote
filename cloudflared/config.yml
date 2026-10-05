@@ -1,0 +1,8 @@
+# AI Remote named tunnel. The credential JSON remains outside the repository.
+tunnel: 5cb81d0b-bea4-40fb-aa07-95f1fd6f1de4
+credentials-file: C:\\Users\\simon\\.cloudflared\\5cb81d0b-bea4-40fb-aa07-95f1fd6f1de4.json
+
+ingress:
+  - hostname: remote.aquariusageai.com
+    service: http://127.0.0.1:8787
+  - service: http_status:404

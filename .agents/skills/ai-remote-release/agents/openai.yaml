@@ -1,0 +1,6 @@
+interface:
+  display_name: "AI Remote Release"
+  short_description: "Prepara e verifica release Android di AI Remote"
+  default_prompt: "Usa $ai-remote-release per preparare e verificare la prossima release Android di AI Remote."
+policy:
+  allow_implicit_invocation: true
