@@ -65,6 +65,17 @@ test("voice turns require auth before contacting OpenAI", async (t) => {
   assert.equal(response.status, 503);
 });
 
+function testWav() {
+  const wav = Buffer.alloc(46);
+  wav.write("RIFF", 0);
+  wav.write("WAVE", 8);
+  wav.writeUInt16LE(1, 20);
+  wav.writeUInt16LE(1, 22);
+  wav.writeUInt32LE(24_000, 24);
+  wav.writeUInt16LE(16, 34);
+  return wav;
+}
+
 test("voice turns transcribe bounded WAV then request an isolated channel response", async (t) => {
   const originalFetch = globalThis.fetch;
   const calls = [];
@@ -87,19 +98,12 @@ test("voice turns transcribe bounded WAV then request an isolated channel respon
   await once(server, "listening");
   t.after(() => server.close());
   const address = server.address();
-  const wav = Buffer.alloc(46);
-  wav.write("RIFF", 0);
-  wav.write("WAVE", 8);
-  wav.writeUInt16LE(1, 20);
-  wav.writeUInt16LE(1, 22);
-  wav.writeUInt32LE(24_000, 24);
-  wav.writeUInt16LE(16, 34);
   const response = await originalFetch(`http://127.0.0.1:${address.port}/v1/voice/turn`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       channelId: "general-chat",
-      audioWavBase64: wav.toString("base64"),
+      audioWavBase64: testWav().toString("base64"),
       history: [{ role: "assistant", content: "Ciao." }],
     }),
   });
@@ -116,6 +120,51 @@ test("voice turns transcribe bounded WAV then request an isolated channel respon
   assert.equal(responseBody.input[0].content, "Ciao.");
   assert.equal(responseBody.input[1].content, "Ciao, come stai?");
   assert.equal(responseBody.store, false);
+});
+
+test("Codex-routed voice turns fall back to OpenAI when Codex is unavailable", async (t) => {
+  const originalFetch = globalThis.fetch;
+  const calls = [];
+  globalThis.fetch = async (url, options) => {
+    calls.push({ url: String(url), options });
+    if (String(url).endsWith("/audio/transcriptions")) {
+      return Response.json({ text: "Preparami il report." });
+    }
+    return Response.json({ output_text: "Report pronto tramite fallback OpenAI." });
+  };
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  const server = createAiRemoteServer({
+    OPENAI_API_KEY: "test-secret",
+    ALLOW_INSECURE_DEV_AUTH: "true",
+    CODEX_APP_SERVER_ENABLED: "false",
+  });
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  t.after(() => server.close());
+  const address = server.address();
+  const response = await originalFetch(`http://127.0.0.1:${address.port}/v1/voice/turn`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      channelId: "lavormetal-daily",
+      backend: "codex",
+      audioWavBase64: testWav().toString("base64"),
+      history: [],
+    }),
+  });
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), {
+    transcript: "Preparami il report.",
+    responseText: "Report pronto tramite fallback OpenAI.",
+    fallbackFrom: "codex",
+  });
+  assert.equal(calls.length, 2);
+  assert.match(calls[0].url, /audio\/transcriptions$/);
+  assert.match(calls[1].url, /\/responses$/);
 });
 
 test("voice turns reject channel ids outside the server allowlist", async (t) => {
