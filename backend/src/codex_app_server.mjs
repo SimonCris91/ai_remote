@@ -37,6 +37,8 @@ export class CodexAppServerClient {
     ], { env: { ...this.env, ACCESS_TOKEN: this.env.CODEX_ACCESS_TOKEN }, stdio: ["pipe", "pipe", "pipe"] });
     this.child.stdout.setEncoding("utf8");
     this.child.stdout.on("data", (chunk) => this.#onData(chunk));
+    this.child.stderr.setEncoding("utf8");
+    this.child.stderr.on("data", (chunk) => console.error(`[codex-app-server] ${chunk}`));
     this.child.on("exit", () => this.#stop(new Error("Codex App Server stopped")));
     await this.#request("initialize", {
       clientInfo: { name: "ai_remote", title: "AI Remote", version: "0.1.0" },
