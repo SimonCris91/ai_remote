@@ -107,48 +107,69 @@ async function processVoiceTurn(body, subject, env, codex, codexThreads) {
     throw Object.assign(new Error("Audio transcription failed"), { status: 502 });
   }
 
+  const requestAssistantResponse = async () => {
+    const response = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${env.OPENAI_API_KEY}`,
+        "content-type": "application/json",
+        "OpenAI-Safety-Identifier": safetyId,
+      },
+      body: JSON.stringify({
+        model: env.OPENAI_RESPONSES_MODEL ?? "gpt-4.1-mini",
+        instructions,
+        input: [
+          ...history.map(({ role, content }) => ({ role, content })),
+          { role: "user", content: transcription.text },
+        ],
+        max_output_tokens: 160,
+        store: false,
+      }),
+      signal: AbortSignal.timeout(60_000),
+    });
+    const result = await response.json();
+    const responseText = result.output_text ?? result.output
+      ?.flatMap((item) => item.content ?? [])
+      .find((item) => item.type === "output_text")?.text;
+    if (!response.ok || typeof responseText !== "string" || !responseText.trim()) {
+      throw Object.assign(new Error("Assistant response failed"), { status: 502 });
+    }
+    return responseText;
+  };
+
   if (body.backend === "codex") {
     const key = `${subject}:${body.channelId}`;
-    const result = await codex.turn({
-      channelId: body.channelId,
-      message: transcription.text,
-      threadId: codexThreads.get(key),
-    });
-    codexThreads.set(key, result.threadId);
-    return {
-      transcript: transcription.text,
-      responseText: result.responseText,
-      codexThreadId: result.threadId,
-    };
+    try {
+      const result = await codex.turn({
+        channelId: body.channelId,
+        message: transcription.text,
+        threadId: codexThreads.get(key),
+      });
+      if (typeof result.responseText !== "string" || !result.responseText.trim()) {
+        throw Object.assign(new Error("Codex returned an empty response"), { status: 502 });
+      }
+      codexThreads.set(key, result.threadId);
+      return {
+        transcript: transcription.text,
+        responseText: result.responseText,
+        codexThreadId: result.threadId,
+      };
+    } catch (error) {
+      const codexStatus = Number.isInteger(error.status) ? error.status : 500;
+      if (codexStatus < 500) throw error;
+      console.warn("[ai-remote] Codex unavailable; falling back to OpenAI Responses.");
+      return {
+        transcript: transcription.text,
+        responseText: await requestAssistantResponse(),
+        fallbackFrom: "codex",
+      };
+    }
   }
 
-  const response = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers: {
-      authorization: `Bearer ${env.OPENAI_API_KEY}`,
-      "content-type": "application/json",
-      "OpenAI-Safety-Identifier": safetyId,
-    },
-    body: JSON.stringify({
-      model: env.OPENAI_RESPONSES_MODEL ?? "gpt-4.1-mini",
-      instructions,
-      input: [
-        ...history.map(({ role, content }) => ({ role, content })),
-        { role: "user", content: transcription.text },
-      ],
-      max_output_tokens: 160,
-      store: false,
-    }),
-    signal: AbortSignal.timeout(60_000),
-  });
-  const result = await response.json();
-  const responseText = result.output_text ?? result.output
-    ?.flatMap((item) => item.content ?? [])
-    .find((item) => item.type === "output_text")?.text;
-  if (!response.ok || typeof responseText !== "string" || !responseText.trim()) {
-    throw Object.assign(new Error("Assistant response failed"), { status: 502 });
-  }
-  return { transcript: transcription.text, responseText };
+  return {
+    transcript: transcription.text,
+    responseText: await requestAssistantResponse(),
+  };
 }
 
 export function createAiRemoteServer(env = process.env) {
