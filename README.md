@@ -145,16 +145,16 @@ Copy `.env.example` to an ignored local environment file or inject the variables
 
 AI Remote can route a selected channel to a persistent Codex App Server thread through
 `POST /v1/codex/turn`. The bridge is disabled by default. When enabled, the backend
-starts `codex app-server` over stdio, keeps the ChatGPT OAuth access token in the
-backend environment, and never sends it to Flutter. Configure `CODEX_ACCESS_TOKEN`,
-`CODEX_WORKSPACE_ROOT`, and `CODEX_APP_SERVER_ENABLED=true` only on a trusted host.
-The first live request must be tested on that host; a local APK cannot access the
-App Server directly.
+starts `codex app-server` over stdio and uses the existing Codex CLI login from
+`CODEX_HOME`. It does not pass the CLI token to the public Responses API; that
+API needs a separate Sign in with ChatGPT grant and scopes. Configure
+`CODEX_WORKSPACE_ROOT` and `CODEX_APP_SERVER_ENABLED=true` only on the trusted
+host where the Codex CLI is installed and signed in. The phone reaches that host
+through the authenticated AI Remote backend.
 
-For the local Windows host, `tool/start_codex_backend.ps1` reads the existing
-Codex login token at runtime, exports it only to the backend process, and starts
-the server with the Codex bridge enabled. The token is never written to the
-repository or sent to the phone.
+For the local Windows host, `tool/start_codex_backend.ps1` uses the existing
+Codex CLI login store and starts the server with the bridge enabled. Credentials
+stay in Codex's local auth store and are never sent to the phone.
 
 To route selected phone channels to Codex, build with the public configuration
 `--dart-define=AI_REMOTE_CODEX_CHANNELS=lavormetal-daily,technical-agent`.

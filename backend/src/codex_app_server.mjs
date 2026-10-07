@@ -20,21 +20,15 @@ export class CodexAppServerClient {
 
   async start() {
     if (!this.enabled) throw Object.assign(new Error("Codex App Server is disabled"), { status: 503 });
-    if (!this.env.CODEX_ACCESS_TOKEN) {
-      throw Object.assign(new Error("Codex App Server credentials are not configured"), { status: 503 });
-    }
     if (this.child) return;
     const binary = this.env.CODEX_BINARY ?? "codex";
-    this.child = this.spawnProcess(binary, [
-      "app-server", "--listen", "stdio://",
-      "-c", "model_provider=\"openai_chatgpt_plan\"",
-      "-c", "model_providers.openai_chatgpt_plan.name=\"ChatGPT plan\"",
-      "-c", "model_providers.openai_chatgpt_plan.base_url=\"https://api.openai.com/v1\"",
-      "-c", "model_providers.openai_chatgpt_plan.env_key=\"ACCESS_TOKEN\"",
-      "-c", "model_providers.openai_chatgpt_plan.wire_api=\"responses\"",
-      "-c", "model_providers.openai_chatgpt_plan.requires_openai_auth=false",
-      "-c", "model_providers.openai_chatgpt_plan.supports_websockets=false",
-    ], { env: { ...this.env, ACCESS_TOKEN: this.env.CODEX_ACCESS_TOKEN }, stdio: ["pipe", "pipe", "pipe"] });
+    // Use Codex's own signed-in provider and auth store (CODEX_HOME). Do not
+    // reinterpret the CLI credential as a direct public Responses API token:
+    // those tokens have different permission scopes.
+    this.child = this.spawnProcess(binary, ["app-server", "--listen", "stdio://"], {
+      env: this.env,
+      stdio: ["pipe", "pipe", "pipe"],
+    });
     this.child.stdout.setEncoding("utf8");
     this.child.stdout.on("data", (chunk) => this.#onData(chunk));
     this.child.stderr.setEncoding("utf8");
@@ -52,8 +46,7 @@ export class CodexAppServerClient {
     let currentThreadId = threadId;
     if (!currentThreadId) {
       const result = await this.#request("thread/start", {
-        model: this.env.CODEX_MODEL ?? "gpt-5-codex",
-        cwd: this.env.CODEX_WORKSPACE_ROOT,
+        ...(this.env.CODEX_WORKSPACE_ROOT ? { cwd: this.env.CODEX_WORKSPACE_ROOT } : {}),
       });
       currentThreadId = result?.thread?.id;
       if (!currentThreadId) throw new Error("Codex thread was not created");
