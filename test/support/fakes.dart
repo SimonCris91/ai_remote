@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:ai_remote/core/models/remote_command.dart';
+import 'package:ai_remote/voice/voice_engine.dart';
 import 'package:ai_remote/remote/remote_controller.dart';
 import 'package:ai_remote/voice/audio_capture_service.dart';
 import 'package:ai_remote/voice/speech_output.dart';
@@ -43,6 +44,42 @@ class RecordingSpeechOutput implements SpeechOutput {
 
   @override
   Future<void> stop() async {}
+
+  @override
+  Future<void> dispose() async {}
+}
+
+class FakeLiveVoiceEngine implements VoiceEngine {
+  final List<TextTurnRequest> textRequests = [];
+  final List<VoiceTurnRequest> voiceRequests = [];
+
+  @override
+  bool get supportsContinuousMode => false;
+
+  @override
+  Future<VoiceTurnResult> processTextTurn(TextTurnRequest request) async {
+    textRequests.add(request);
+    return const VoiceTurnResult(
+      transcript: '',
+      responseText: 'Turno Codex completato.',
+      codexThreadId: 'thread-codex-developer',
+    );
+  }
+
+  @override
+  Future<VoiceTurnResult> processPushToTalkTurn(
+    VoiceTurnRequest request,
+  ) async {
+    voiceRequests.add(request);
+    return const VoiceTurnResult(
+      transcript: 'Fai una modifica.',
+      responseText: 'Turno Codex completato.',
+      codexThreadId: 'thread-codex-developer',
+    );
+  }
+
+  @override
+  Future<void> cancel() async {}
 
   @override
   Future<void> dispose() async {}

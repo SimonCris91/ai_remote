@@ -3,6 +3,7 @@ import 'package:ai_remote/core/models/channel_type.dart';
 import 'package:ai_remote/core/models/conversation_message.dart';
 import 'package:ai_remote/core/models/conversation_session.dart';
 import 'package:ai_remote/services/channel_selection_store.dart';
+import 'package:ai_remote/services/conversation_store.dart';
 import 'package:flutter/foundation.dart';
 
 class ChannelManager extends ChangeNotifier {
@@ -10,8 +11,10 @@ class ChannelManager extends ChangeNotifier {
     required this.selectionStore,
     List<Channel>? channels,
     ChannelCatalogStore? catalogStore,
+    ConversationStore? conversationStore,
   }) : _channels = List<Channel>.from(channels ?? defaultChannels),
-       catalogStore = catalogStore ?? MemoryChannelCatalogStore() {
+       catalogStore = catalogStore ?? MemoryChannelCatalogStore(),
+       conversationStore = conversationStore ?? MemoryConversationStore() {
     if (_channels.isEmpty) {
       throw ArgumentError.value(channels, 'channels', 'Cannot be empty');
     }
@@ -51,13 +54,31 @@ class ChannelManager extends ChangeNotifier {
       instructions:
           'Act as a practical technical assistant. Give safe, concise steps.',
     ),
+    Channel(
+      id: 'codex-developer',
+      name: 'Codex Developer',
+      type: ChannelType.agent,
+      description: 'Sviluppo AI Remote · un turno autorizzato alla volta',
+      instructions:
+          'Sei Codex Developer per AI Remote. Lavora esclusivamente nel checkout AI Remote indicato dal server. Prima leggi AGENTS.md e rispetta le regole del repository. Per richieste di implementazione ispeziona il codice coinvolto, modifica il minimo necessario, esegui i controlli pertinenti e riassumi file e risultati. Non leggere o stampare segreti. Non fare commit, push, deploy, installazioni su dispositivi o modifiche ad altri progetti. Se un’attività richiede accesso fuori dal checkout, rete, credenziali o un’azione esterna, fermati e chiedi conferma.',
+    ),
+    Channel(
+      id: 'lumen-system',
+      name: 'LumenSystem',
+      type: ChannelType.agent,
+      description: 'Consulta attività · sola lettura',
+      instructions:
+          'Assistente per la consultazione in sola lettura delle attività LumenSystem. Non dichiarare di aver creato o modificato dati.',
+    ),
   ];
 
   final ChannelSelectionStore selectionStore;
   final ChannelCatalogStore catalogStore;
+  final ConversationStore conversationStore;
   final List<Channel> _channels;
   final Map<String, ConversationSession> _sessions = {};
   int _selectedIndex = 0;
+  bool _initialized = false;
 
   List<Channel> get channels => _channels;
   int get selectedIndex => _selectedIndex;
@@ -65,6 +86,7 @@ class ChannelManager extends ChangeNotifier {
   ConversationSession get selectedSession => sessionFor(selectedChannel.id);
 
   Future<void> initialize() async {
+    if (_initialized) return;
     final customChannels = await catalogStore.readCustomChannels();
     for (final channel in customChannels) {
       if (_channels.every((candidate) => candidate.id != channel.id)) {
@@ -75,6 +97,17 @@ class ChannelManager extends ChangeNotifier {
     final savedId = await selectionStore.readSelectedChannelId();
     final savedIndex = _channels.indexWhere((channel) => channel.id == savedId);
     _selectedIndex = savedIndex >= 0 ? savedIndex : 0;
+    final storedMessages = await conversationStore.readAllMessages();
+    for (final entry in storedMessages.entries) {
+      final session = _sessions[entry.key];
+      session?.addAll(entry.value);
+    }
+    final codexThreadIds = await conversationStore.readCodexThreadIds();
+    for (final entry in codexThreadIds.entries) {
+      final session = _sessions[entry.key];
+      if (session != null) session.codexThreadId = entry.value;
+    }
+    _initialized = true;
     notifyListeners();
   }
 
@@ -135,6 +168,7 @@ class ChannelManager extends ChangeNotifier {
     _selectedIndex = _selectedIndex.clamp(0, _channels.length - 1);
     await _persistCustomChannels();
     await _persistSelection();
+    await conversationStore.deleteChannel(channelId);
     notifyListeners();
   }
 
@@ -142,9 +176,18 @@ class ChannelManager extends ChangeNotifier {
     _channels.where((channel) => !defaultChannels.contains(channel)).toList(),
   );
 
-  void addMessage(String channelId, ConversationMessage message) {
-    sessionFor(channelId).add(message);
+  Future<void> addMessages(
+    String channelId,
+    List<ConversationMessage> messages,
+  ) async {
+    sessionFor(channelId).addAll(messages);
+    await conversationStore.appendMessages(channelId, messages);
     notifyListeners();
+  }
+
+  Future<void> saveCodexThreadId(String channelId, String threadId) async {
+    sessionFor(channelId).codexThreadId = threadId;
+    await conversationStore.saveCodexThreadId(channelId, threadId);
   }
 
   Future<void> _persistSelection() =>

@@ -58,7 +58,7 @@ class _MessageRow extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(
-            isUser ? Icons.mic_none_rounded : Icons.auto_awesome_rounded,
+            isUser ? Icons.person_outline_rounded : Icons.auto_awesome_rounded,
             size: 17,
             color: isUser ? const Color(0xFF63E6BE) : const Color(0xFF7AA2FF),
           ),

@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="it">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#081323">
+    <meta name="description" content="AI Remote: controlla chat vocali e traduzioni dal telefono, con comandi semplici e indipendenti dall'orologio.">
+    <title>AI Remote — le tue chat, a portata di voce</title>
+    <link rel="stylesheet" href="/assets/site.css">
+    <script src="/assets/site.js" defer></script>
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="AI Remote, pagina iniziale">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 40 40" role="img"><path d="M5 12c5-5 9 5 15 0s10 5 15 0M5 20c5-5 9 5 15 0s10 5 15 0M5 28c5-5 9 5 15 0s10 5 15 0" /></svg>
+        </span>
+        <span>AI <strong>REMOTE</strong></span>
+      </a>
+      <nav aria-label="Navigazione principale">
+        <a href="#come-funziona">Come funziona</a>
+        <a href="#canali">Canali</a>
+      </nav>
+      <div class="service-pill" id="service-status" role="status" aria-live="polite">
+        <span class="status-dot" aria-hidden="true"></span>
+        <span id="service-status-text">Verifico il servizio…</span>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero" aria-labelledby="hero-title">
+        <div class="hero-copy">
+          <p class="eyebrow"><span></span> VOICE-FIRST CONTROLLER</p>
+          <h1 id="hero-title">Le tue chat,<br><em>a portata di voce.</em></h1>
+          <p class="hero-text">Scegli un canale dal telefono e parla. AI Remote tiene separate le conversazioni e ti lascia usare i comandi media dell’orologio, dell’auto o degli auricolari compatibili.</p>
+          <a class="button button-primary" href="#come-funziona">Scopri come funziona <span aria-hidden="true">↘</span></a>
+          <p class="hero-note">Il telefono gestisce AI e audio. Il wearable resta un telecomando.</p>
+        </div>
+
+        <div class="remote-card" aria-label="Anteprima dei comandi AI Remote">
+          <div class="remote-card-top"><span>AI REMOTE</span><span class="live-label"><i></i> PRONTO</span></div>
+          <div class="channel-preview">
+            <span class="channel-kicker">CANALE SELEZIONATO</span>
+            <strong>GENERAL CHAT</strong>
+            <span>Contesto personale</span>
+          </div>
+          <div class="controls" aria-hidden="true">
+            <span class="control control-side">|◀</span>
+            <span class="control control-main">▶</span>
+            <span class="control control-side">▶|</span>
+          </div>
+          <div class="remote-hint"><span>⏮</span> cambia canale <span>·</span> <span>▶</span> parla <span>·</span> <span>⏭</span> cambia canale</div>
+        </div>
+      </section>
+
+      <section class="how section" id="come-funziona" aria-labelledby="how-title">
+        <div class="section-heading">
+          <p class="eyebrow">SEMPLICE COME LA MUSICA</p>
+          <h2 id="how-title">Una chat per ogni momento.</h2>
+          <p>Precedente, Play, Successivo: scegli il canale e interagisci senza cercare ogni volta la chat sul telefono.</p>
+        </div>
+        <div class="steps">
+          <article class="step-card"><span class="step-number">01</span><h3>Scegli</h3><p>Scorri tra chat, traduttore e assistenti dedicati.</p></article>
+          <article class="step-card"><span class="step-number">02</span><h3>Parla</h3><p>Tieni premuto per registrare; rilascia per inviare il turno.</p></article>
+          <article class="step-card"><span class="step-number">03</span><h3>Continua</h3><p>Ogni chat conserva il proprio contesto indipendente.</p></article>
+        </div>
+      </section>
+
+      <section class="channels section" id="canali" aria-labelledby="channels-title">
+        <div class="section-heading">
+          <p class="eyebrow">I TUOI CANALI</p>
+          <h2 id="channels-title">Un controller, più possibilità.</h2>
+        </div>
+        <div class="channel-grid">
+          <article class="feature-card"><span class="feature-icon" aria-hidden="true">◯</span><h3>Chat separate</h3><p>Conversazioni personali e assistenti con cronologia distinta.</p></article>
+          <article class="feature-card"><span class="feature-icon" aria-hidden="true">文</span><h3>Traduttore</h3><p>Seleziona le lingue, parla a turno e ascolta la traduzione.</p></article>
+          <article class="feature-card"><span class="feature-icon" aria-hidden="true">⌁</span><h3>Comandi universali</h3><p>Un’architettura indipendente dal produttore dell’orologio.</p></article>
+        </div>
+      </section>
+
+      <section class="app-notice" aria-label="Disponibilità">
+        <span class="notice-icon" aria-hidden="true">◌</span>
+        <div><strong>L’interfaccia di controllo è nell’app Android.</strong><p>Questa pagina presenta AI Remote e mostra lo stato del backend; non sostituisce ancora l’app per chattare o controllare i canali.</p></div>
+        <span class="notice-status" id="notice-status">Backend in verifica</span>
+      </section>
+    </main>
+
+    <footer class="footer"><a class="brand footer-brand" href="/"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 40 40"><path d="M5 12c5-5 9 5 15 0s10 5 15 0M5 20c5-5 9 5 15 0s10 5 15 0M5 28c5-5 9 5 15 0s10 5 15 0" /></svg></span><span>AI <strong>REMOTE</strong></span></a><span>Voce, canali e controllo. Senza legarsi a un solo wearable.</span><span>© <span id="year">2026</span> AI Remote</span></footer>
+  </body>
+</html>

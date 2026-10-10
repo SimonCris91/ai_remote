@@ -17,6 +17,8 @@ class AiRemoteStateMachine extends ChangeNotifier {
     AiRemoteState.channelSelected: {
       AiRemoteState.idle,
       AiRemoteState.listening,
+      AiRemoteState.processing,
+      AiRemoteState.translating,
       AiRemoteState.disconnected,
       AiRemoteState.error,
     },
@@ -53,6 +55,8 @@ class AiRemoteStateMachine extends ChangeNotifier {
     AiRemoteState.disconnected: {
       AiRemoteState.idle,
       AiRemoteState.channelSelected,
+      AiRemoteState.processing,
+      AiRemoteState.translating,
       AiRemoteState.error,
     },
   };

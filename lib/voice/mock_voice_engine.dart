@@ -35,6 +35,16 @@ class MockVoiceEngine implements VoiceEngine {
   }
 
   @override
+  Future<VoiceTurnResult> processTextTurn(TextTurnRequest request) async {
+    await Future<void>.delayed(latency);
+    final direction = request.translationDirection;
+    final response = request.channel.type == ChannelType.translator
+        ? '[MOCK] Traduzione ${direction?.targetName ?? 'destinazione'}: ${request.text}'
+        : '[MOCK] Ho ricevuto il tuo messaggio: ${request.text}';
+    return VoiceTurnResult(transcript: request.text, responseText: response);
+  }
+
+  @override
   Future<void> cancel() async {}
 
   @override

@@ -4,6 +4,7 @@ import 'package:ai_remote/core/state/ai_remote_state_machine.dart';
 import 'package:ai_remote/remote/media_session_remote_adapter.dart';
 import 'package:ai_remote/remote/remote_controller.dart';
 import 'package:ai_remote/services/channel_selection_store.dart';
+import 'package:ai_remote/services/sqlite_conversation_store.dart';
 import 'package:ai_remote/services/screen_awake_service.dart';
 import 'package:ai_remote/services/watch_live_display_service.dart';
 import 'package:ai_remote/music/chord_analyzer.dart';
@@ -85,6 +86,7 @@ Future<AppController> createDefaultAppController() async {
     channelManager: ChannelManager(
       selectionStore: SharedPreferencesChannelSelectionStore(),
       catalogStore: SharedPreferencesChannelCatalogStore(),
+      conversationStore: SqliteConversationStore(),
     ),
     stateMachine: AiRemoteStateMachine(),
     voiceEngine: MockVoiceEngine(),

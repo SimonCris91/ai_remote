@@ -89,6 +89,8 @@ class AppController extends ChangeNotifier {
   RemoteConnectionState _remoteConnectionState =
       RemoteConnectionState.unavailable;
   RemotePresentation? _lastRemotePresentation;
+  DateTime? _codexTurnConsentExpiresAt;
+  Timer? _codexTurnConsentTimer;
 
   AiRemoteState get state => stateMachine.state;
   String? get errorMessage => stateMachine.errorMessage;
@@ -121,6 +123,35 @@ class AppController extends ChangeNotifier {
   PitchEstimate? get currentPitch => pitchTuner?.current;
 
   bool get selectedChannelIsActive => _activeChannelId == selectedChannel.id;
+  bool get isCodexDeveloperChannel => selectedChannel.id == 'codex-developer';
+  bool get codexDeveloperReady =>
+      isCodexDeveloperChannel &&
+      !isMockMode &&
+      codexChannelIds.contains(selectedChannel.id);
+  bool get canAuthorizeCodexTurn => codexDeveloperReady && !_isBusy;
+  bool get codexTurnConsentActive =>
+      _codexTurnConsentExpiresAt?.isAfter(DateTime.now()) ?? false;
+
+  void authorizeNextCodexTurn() {
+    if (!codexDeveloperReady) {
+      throw StateError(
+        'Codex Developer richiede app collegata e build configurata per Codex.',
+      );
+    }
+    if (_isBusy) {
+      throw StateError('Attendi il completamento del turno Codex in corso.');
+    }
+    _codexTurnConsentTimer?.cancel();
+    _codexTurnConsentExpiresAt = DateTime.now().add(const Duration(minutes: 1));
+    _codexTurnConsentTimer = Timer(const Duration(minutes: 1), () {
+      _codexTurnConsentExpiresAt = null;
+      _publishChanges();
+    });
+    if (state == AiRemoteState.error || state == AiRemoteState.idle) {
+      stateMachine.transitionTo(AiRemoteState.channelSelected);
+    }
+    _publishChanges();
+  }
 
   Future<void> initialize() async {
     await channelManager.initialize();
@@ -246,6 +277,7 @@ class AppController extends ChangeNotifier {
   }
 
   Future<void> _prepareForChannelChange() async {
+    _clearCodexTurnConsent();
     await cancelCurrentInteraction();
     _activeChannelId = null;
     if (state == AiRemoteState.error || state == AiRemoteState.idle) {
@@ -263,6 +295,7 @@ class AppController extends ChangeNotifier {
     if (state == AiRemoteState.aiSpeaking) {
       await cancelCurrentInteraction();
     }
+    if (!_consumeCodexTurnConsent()) return;
     if (state == AiRemoteState.error || state == AiRemoteState.idle) {
       stateMachine.transitionTo(AiRemoteState.channelSelected);
     }
@@ -324,6 +357,7 @@ class AppController extends ChangeNotifier {
         channel: channel,
         history: session.messages,
         audio: audio,
+        codexThreadId: session.codexThreadId,
         backendTarget: codexChannelIds.contains(channel.id)
             ? VoiceBackendTarget.codex
             : VoiceBackendTarget.openai,
@@ -332,21 +366,19 @@ class AppController extends ChangeNotifier {
     if (operation != _operationId) {
       return;
     }
-    channelManager
-      ..addMessage(
-        channel.id,
-        ConversationMessage(
-          role: ConversationRole.user,
-          content: result.transcript,
-        ),
-      )
-      ..addMessage(
-        channel.id,
-        ConversationMessage(
-          role: ConversationRole.assistant,
-          content: result.responseText,
-        ),
-      );
+    if (result.codexThreadId case final threadId?) {
+      await channelManager.saveCodexThreadId(channel.id, threadId);
+    }
+    await channelManager.addMessages(channel.id, [
+      ConversationMessage(
+        role: ConversationRole.user,
+        content: result.transcript,
+      ),
+      ConversationMessage(
+        role: ConversationRole.assistant,
+        content: result.responseText,
+      ),
+    ]);
     stateMachine.transitionTo(AiRemoteState.aiSpeaking);
     await speechOutput.speak(result.responseText, languageCode: 'it');
     _completeOperation(operation);
@@ -364,27 +396,82 @@ class AppController extends ChangeNotifier {
     if (operation != _operationId) {
       return;
     }
-    channelManager
-      ..addMessage(
-        channelId,
-        ConversationMessage(
-          role: ConversationRole.user,
-          content: result.sourceTranscript,
-        ),
-      )
-      ..addMessage(
-        channelId,
-        ConversationMessage(
-          role: ConversationRole.assistant,
-          content: result.translatedText,
-        ),
-      );
+    await channelManager.addMessages(channelId, [
+      ConversationMessage(
+        role: ConversationRole.user,
+        content: result.sourceTranscript,
+      ),
+      ConversationMessage(
+        role: ConversationRole.assistant,
+        content: result.translatedText,
+      ),
+    ]);
     stateMachine.transitionTo(AiRemoteState.aiSpeaking);
     await speechOutput.speak(
       result.translatedText,
       languageCode: _translationDirection.targetCode,
     );
     _completeOperation(operation);
+  }
+
+  Future<bool> sendTextMessage(String text) async {
+    final cleanText = text.trim();
+    if (cleanText.isEmpty || _isBusy || isChordMonitorActive || isTunerActive) {
+      return false;
+    }
+    if (!_consumeCodexTurnConsent()) return false;
+
+    if (state == AiRemoteState.error || state == AiRemoteState.idle) {
+      stateMachine.transitionTo(AiRemoteState.channelSelected);
+    }
+    final operation = ++_operationId;
+    final channel = selectedChannel;
+    final session = channelManager.sessionFor(channel.id);
+    final isTranslator = channel.type == ChannelType.translator;
+    _activeChannelId = channel.id;
+    stateMachine.transitionTo(
+      isTranslator ? AiRemoteState.translating : AiRemoteState.processing,
+    );
+    _publishChanges();
+
+    try {
+      final result = await voiceEngine.processTextTurn(
+        TextTurnRequest(
+          channel: channel,
+          text: cleanText,
+          history: session.messages,
+          backendTarget: codexChannelIds.contains(channel.id)
+              ? VoiceBackendTarget.codex
+              : VoiceBackendTarget.openai,
+          codexThreadId: session.codexThreadId,
+          translationDirection: isTranslator ? _translationDirection : null,
+        ),
+      );
+      if (operation != _operationId) return false;
+      if (result.codexThreadId case final threadId?) {
+        await channelManager.saveCodexThreadId(channel.id, threadId);
+      }
+      await channelManager.addMessages(channel.id, [
+        ConversationMessage(role: ConversationRole.user, content: cleanText),
+        ConversationMessage(
+          role: ConversationRole.assistant,
+          content: result.responseText,
+        ),
+      ]);
+      if (operation == _operationId) {
+        _activeChannelId = null;
+        stateMachine.transitionTo(AiRemoteState.channelSelected);
+        _publishChanges();
+      }
+      return true;
+    } catch (error) {
+      if (operation == _operationId) {
+        _activeChannelId = null;
+        stateMachine.fail(error);
+        _publishChanges(syncRemote: false);
+      }
+      return false;
+    }
   }
 
   void _completeOperation(int operation) {
@@ -459,6 +546,7 @@ class AppController extends ChangeNotifier {
   }
 
   Future<void> cancelCurrentInteraction() async {
+    _clearCodexTurnConsent();
     _operationId += 1;
     await Future.wait([
       audioCapture.cancel(),
@@ -472,6 +560,37 @@ class AppController extends ChangeNotifier {
         state != AiRemoteState.disconnected) {
       stateMachine.transitionTo(AiRemoteState.channelSelected);
     }
+  }
+
+  bool _consumeCodexTurnConsent() {
+    if (!isCodexDeveloperChannel) return true;
+    if (!codexDeveloperReady) {
+      stateMachine.fail(
+        StateError(
+          'Collega AI Remote e usa una build instradata al backend Codex.',
+        ),
+      );
+      _publishChanges(syncRemote: false);
+      return false;
+    }
+    if (!codexTurnConsentActive) {
+      stateMachine.fail(
+        StateError(
+          'Prima autorizza un turno Codex dal telefono. L’autorizzazione vale un minuto e un solo turno.',
+        ),
+      );
+      _publishChanges(syncRemote: false);
+      return false;
+    }
+    _clearCodexTurnConsent();
+    _publishChanges();
+    return true;
+  }
+
+  void _clearCodexTurnConsent() {
+    _codexTurnConsentTimer?.cancel();
+    _codexTurnConsentTimer = null;
+    _codexTurnConsentExpiresAt = null;
   }
 
   bool get _isBusy => switch (state) {
@@ -622,6 +741,7 @@ class AppController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _clearCodexTurnConsent();
     channelManager.removeListener(_relayChanges);
     stateMachine.removeListener(_relayChanges);
     chordMonitor?.removeListener(_relayChanges);

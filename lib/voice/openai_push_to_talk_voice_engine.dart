@@ -48,7 +48,10 @@ class OpenAiPushToTalkVoiceEngine implements VoiceEngine {
     httpRequest.write(
       jsonEncode(<String, Object?>{
         'channelId': request.channel.id,
+        'channelInstructions': request.channel.instructions,
         'backend': request.backendTarget.name,
+        if (request.codexThreadId != null)
+          'codexThreadId': request.codexThreadId,
         'audioWavBase64': base64Encode(wav),
         'history': request.history
             .take(40)
@@ -82,7 +85,77 @@ class OpenAiPushToTalkVoiceEngine implements VoiceEngine {
     return VoiceTurnResult(
       transcript: result['transcript'] as String,
       responseText: result['responseText'] as String,
+      codexThreadId: result['codexThreadId'] as String?,
     );
+  }
+
+  @override
+  Future<VoiceTurnResult> processTextTurn(TextTurnRequest request) async {
+    final text = request.text.trim();
+    if (text.isEmpty) {
+      throw const HttpException('Scrivi un messaggio prima di inviarlo.');
+    }
+    final token = await accessTokenProvider();
+    if (token == null || token.isEmpty) {
+      throw const HttpException('Accesso al backend non configurato.');
+    }
+
+    final endpoint = backendUri.resolve('/v1/chat/turn');
+    final httpRequest = await _httpClient.postUrl(endpoint);
+    _activeRequest = httpRequest;
+    httpRequest.headers
+      ..set(HttpHeaders.authorizationHeader, 'Bearer $token')
+      ..contentType = ContentType.json;
+    httpRequest.write(
+      jsonEncode(<String, Object?>{
+        'channelId': request.channel.id,
+        'channelInstructions': request.channel.instructions,
+        'backend': request.backendTarget.name,
+        'text': text,
+        if (request.codexThreadId != null)
+          'codexThreadId': request.codexThreadId,
+        if (request.translationDirection case final direction?)
+          'translationDirection': <String, String>{
+            'sourceCode': direction.sourceCode,
+            'targetCode': direction.targetCode,
+          },
+        'history': request.history
+            .take(40)
+            .map(
+              (message) => <String, String>{
+                'role': message.role == ConversationRole.user
+                    ? 'user'
+                    : 'assistant',
+                'content': message.content,
+              },
+            )
+            .toList(growable: false),
+      }),
+    );
+
+    final response = await httpRequest.close();
+    _activeRequest = null;
+    final responseBody = await response.transform(utf8.decoder).join();
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw _httpError(responseBody, endpoint);
+    }
+    final result = jsonDecode(responseBody) as Map<String, dynamic>;
+    return VoiceTurnResult(
+      transcript: text,
+      responseText: result['responseText'] as String,
+      codexThreadId: result['codexThreadId'] as String?,
+    );
+  }
+
+  HttpException _httpError(String responseBody, Uri endpoint) {
+    var message = 'Il servizio vocale non è disponibile.';
+    try {
+      final decoded = jsonDecode(responseBody) as Map<String, dynamic>;
+      if (decoded['error'] is String) message = decoded['error'] as String;
+    } on FormatException {
+      // Keep the message generic rather than exposing backend internals.
+    }
+    return HttpException(message, uri: endpoint);
   }
 
   static Uint8List _wrapPcm16AsWav(Uint8List pcm) {

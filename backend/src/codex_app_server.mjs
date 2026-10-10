@@ -25,7 +25,15 @@ export class CodexAppServerClient {
     // Use Codex's own signed-in provider and auth store (CODEX_HOME). Do not
     // reinterpret the CLI credential as a direct public Responses API token:
     // those tokens have different permission scopes.
-    this.child = this.spawnProcess(binary, ["app-server", "--listen", "stdio://"], {
+    this.child = this.spawnProcess(binary, [
+      "app-server",
+      "--listen",
+      "stdio://",
+      "-c",
+      'sandbox_mode="workspace-write"',
+      "-c",
+      'approval_policy="on-request"',
+    ], {
       env: this.env,
       stdio: ["pipe", "pipe", "pipe"],
     });

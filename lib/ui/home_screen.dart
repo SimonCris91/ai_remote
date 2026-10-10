@@ -4,7 +4,8 @@ import 'package:ai_remote/core/models/remote_command.dart';
 import 'package:ai_remote/core/state/ai_remote_state.dart';
 import 'package:ai_remote/remote/remote_controller.dart';
 import 'package:ai_remote/ui/widgets/conversation_panel.dart';
-import 'package:ai_remote/ui/widgets/chord_monitor_card.dart';
+import 'package:ai_remote/ui/widgets/codex_developer_card.dart';
+import 'package:ai_remote/ui/widgets/text_message_composer.dart';
 import 'package:ai_remote/ui/widgets/live_chord_view.dart';
 import 'package:ai_remote/ui/widgets/tuner_view.dart';
 import 'package:ai_remote/ui/widgets/state_badge.dart';
@@ -170,8 +171,11 @@ class HomeScreen extends StatelessWidget {
                           liveChordMode || controller.selectedChannelIsActive,
                       isLiveMode: liveChordMode,
                     ),
+                    if (controller.isCodexDeveloperChannel) ...[
+                      const SizedBox(height: 12),
+                      CodexDeveloperCard(controller: controller),
+                    ],
                     const SizedBox(height: 14),
-                    ChordMonitorCard(controller: controller),
                     if (!liveChordMode &&
                         channel.type == ChannelType.translator) ...[
                       const SizedBox(height: 10),
@@ -185,6 +189,10 @@ class HomeScreen extends StatelessWidget {
                     const SizedBox(height: 18),
                     if (!liveChordMode)
                       ConversationPanel(session: controller.selectedSession),
+                    if (!liveChordMode) ...[
+                      const SizedBox(height: 12),
+                      TextMessageComposer(controller: controller),
+                    ],
                     if (controller.state == AiRemoteState.error) ...[
                       const SizedBox(height: 12),
                       _ErrorPanel(

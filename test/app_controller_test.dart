@@ -10,11 +10,115 @@ import 'package:ai_remote/remote/remote_controller.dart';
 import 'package:ai_remote/services/channel_selection_store.dart';
 import 'package:ai_remote/translator/mock_translator_service.dart';
 import 'package:ai_remote/voice/mock_voice_engine.dart';
+import 'package:ai_remote/voice/voice_engine.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'support/fakes.dart';
 
 void main() {
+  test(
+    'typed message gets a mock reply and enters the channel history',
+    () async {
+      final controller = AppController(
+        channelManager: ChannelManager(
+          selectionStore: MemoryChannelSelectionStore(),
+        ),
+        stateMachine: AiRemoteStateMachine(),
+        voiceEngine: MockVoiceEngine(latency: Duration.zero),
+        translatorService: MockTranslatorService(latency: Duration.zero),
+        audioCapture: FakeAudioCaptureService(),
+        speechOutput: RecordingSpeechOutput(),
+      );
+      await controller.initialize();
+
+      expect(await controller.sendTextMessage('  Ciao AI Remote  '), isTrue);
+      expect(controller.state, AiRemoteState.channelSelected);
+      expect(controller.selectedSession.messages, hasLength(2));
+      expect(
+        controller.selectedSession.messages.first.content,
+        'Ciao AI Remote',
+      );
+      expect(
+        controller.selectedSession.messages.last.content,
+        contains('[MOCK]'),
+      );
+    },
+  );
+
+  test('Codex Developer requires a one-turn approval from the phone', () async {
+    final engine = FakeLiveVoiceEngine();
+    final controller = AppController(
+      channelManager: ChannelManager(
+        selectionStore: MemoryChannelSelectionStore(
+          selectedChannelId: 'codex-developer',
+        ),
+      ),
+      stateMachine: AiRemoteStateMachine(),
+      voiceEngine: engine,
+      translatorService: MockTranslatorService(latency: Duration.zero),
+      audioCapture: FakeAudioCaptureService(),
+      speechOutput: RecordingSpeechOutput(),
+      codexChannelIds: const {'codex-developer'},
+    );
+    await controller.initialize();
+
+    expect(controller.codexDeveloperReady, isTrue);
+    expect(await controller.sendTextMessage('Modifica il progetto'), isFalse);
+    expect(controller.state, AiRemoteState.error);
+    expect(engine.textRequests, isEmpty);
+
+    await controller.cancelCurrentInteraction();
+    controller.authorizeNextCodexTurn();
+    expect(controller.codexTurnConsentActive, isTrue);
+    expect(await controller.sendTextMessage('Modifica il progetto'), isTrue);
+    expect(engine.textRequests.single.backendTarget, VoiceBackendTarget.codex);
+    expect(controller.codexTurnConsentActive, isFalse);
+    expect(await controller.sendTextMessage('Altro turno'), isFalse);
+    expect(engine.textRequests, hasLength(1));
+  });
+
+  test(
+    'watch push-to-talk cannot start a Codex turn without phone approval',
+    () async {
+      final audio = FakeAudioCaptureService();
+      final engine = FakeLiveVoiceEngine();
+      final controller = AppController(
+        channelManager: ChannelManager(
+          selectionStore: MemoryChannelSelectionStore(
+            selectedChannelId: 'codex-developer',
+          ),
+        ),
+        stateMachine: AiRemoteStateMachine(),
+        voiceEngine: engine,
+        translatorService: MockTranslatorService(latency: Duration.zero),
+        audioCapture: audio,
+        speechOutput: RecordingSpeechOutput(),
+        codexChannelIds: const {'codex-developer'},
+      );
+      await controller.initialize();
+
+      await controller.handleRemoteCommand(RemoteCommand.play);
+
+      expect(audio.startCount, 0);
+      expect(controller.state, AiRemoteState.error);
+      expect(controller.errorMessage, contains('autorizza'));
+
+      await controller.cancelCurrentInteraction();
+      controller.authorizeNextCodexTurn();
+      await controller.handleRemoteCommand(RemoteCommand.play);
+      expect(controller.state, AiRemoteState.listening);
+      await controller.handleRemoteCommand(RemoteCommand.play);
+      expect(controller.state, AiRemoteState.listening);
+      expect(audio.startCount, 1);
+      await controller.handleRemoteCommand(RemoteCommand.stop);
+      expect(
+        engine.voiceRequests.single.backendTarget,
+        VoiceBackendTarget.codex,
+      );
+      expect(controller.codexTurnConsentActive, isFalse);
+    },
+  );
+
   test(
     'mock push-to-talk produces speech and preserves channel context',
     () async {

@@ -14,6 +14,39 @@ import 'package:flutter_test/flutter_test.dart';
 import 'support/fakes.dart';
 
 void main() {
+  testWidgets('Codex Developer shows explicit one-turn consent', (
+    tester,
+  ) async {
+    final controller = AppController(
+      channelManager: ChannelManager(
+        selectionStore: MemoryChannelSelectionStore(
+          selectedChannelId: 'codex-developer',
+        ),
+      ),
+      stateMachine: AiRemoteStateMachine(),
+      voiceEngine: FakeLiveVoiceEngine(),
+      translatorService: MockTranslatorService(latency: Duration.zero),
+      audioCapture: FakeAudioCaptureService(),
+      speechOutput: RecordingSpeechOutput(),
+      codexChannelIds: const {'codex-developer'},
+    );
+    await controller.initialize();
+    await tester.pumpWidget(AiRemoteApp(controller: controller));
+
+    expect(find.byKey(const Key('codexDeveloperCard')), findsOneWidget);
+    expect(find.byKey(const Key('authorizeCodexTurn')), findsOneWidget);
+    await tester.ensureVisible(find.byKey(const Key('authorizeCodexTurn')));
+    await tester.tap(find.byKey(const Key('authorizeCodexTurn')));
+    await tester.pumpAndSettle();
+    expect(find.text('Autorizza un turno Codex'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('approveCodexTurn')));
+    await tester.pumpAndSettle();
+    expect(controller.codexTurnConsentActive, isTrue);
+    expect(find.textContaining('Un turno autorizzato'), findsOneWidget);
+    await controller.cancelCurrentInteraction();
+  });
+
   testWidgets('phone UI navigates channels with remote controls', (
     tester,
   ) async {
@@ -32,7 +65,11 @@ void main() {
 
     expect(find.text('GENERAL CHAT'), findsOneWidget);
     expect(find.text('MOCK'), findsOneWidget);
+    expect(find.text('LIVE CHORD MONITOR'), findsNothing);
+    expect(find.byKey(const Key('tunerButton')), findsNothing);
+    expect(find.byKey(const Key('chordMonitorButton')), findsNothing);
 
+    await tester.ensureVisible(find.byKey(const Key('nextButton')));
     await tester.tap(find.byKey(const Key('nextButton')));
     await tester.pumpAndSettle();
 
@@ -40,6 +77,39 @@ void main() {
     expect(
       find.byKey(const Key('reverseTranslationDirection')),
       findsOneWidget,
+    );
+  });
+
+  testWidgets('phone UI sends a typed message to the selected channel', (
+    tester,
+  ) async {
+    final controller = AppController(
+      channelManager: ChannelManager(
+        selectionStore: MemoryChannelSelectionStore(),
+      ),
+      stateMachine: AiRemoteStateMachine(),
+      voiceEngine: MockVoiceEngine(latency: Duration.zero),
+      translatorService: MockTranslatorService(latency: Duration.zero),
+      audioCapture: FakeAudioCaptureService(),
+      speechOutput: RecordingSpeechOutput(),
+    );
+    await controller.initialize();
+    await tester.pumpWidget(AiRemoteApp(controller: controller));
+    await tester.ensureVisible(find.byKey(const Key('messageInput')));
+    await tester.enterText(
+      find.byKey(const Key('messageInput')),
+      'Messaggio scritto',
+    );
+    await tester.tap(find.byKey(const Key('sendTextMessage')));
+    await tester.pumpAndSettle();
+
+    expect(
+      controller.selectedSession.messages.first.content,
+      'Messaggio scritto',
+    );
+    expect(
+      controller.selectedSession.messages.last.content,
+      contains('[MOCK]'),
     );
   });
 
